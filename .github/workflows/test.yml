@@ -1,0 +1,25 @@
+name: Tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Simulator, forecast, planner and page API tests (standard library only)
+        run: python tests/test_trafficflow.py
+      - name: Check the practice data is reproducible
+        run: |
+          cp data/synthetic_drive_through.csv /tmp/before.csv
+          python training/make_data.py
+          cmp data/synthetic_drive_through.csv /tmp/before.csv
+      - name: Car counter test on the sample clip
+        run: |
+          pip install numpy opencv-python-headless
+          python tests/test_vision.py

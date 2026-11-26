@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TrafficFlow</title>
+  <meta name="description" content="Simulate drive-through and parking-lot queues car by car, forecast arrivals with machine learning, plan staff and count cars from video. Python running in your browser.">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="top">
+    <div class="brand">
+      <img src="icon.svg" alt="" width="44" height="44" class="logo">
+      <div>
+        <h1>TrafficFlow</h1>
+        <p class="tag">Vehicle queues on business property: simulate, forecast, plan staff, count cars</p>
+      </div>
+    </div>
+    <span class="pill" id="pyStatus">Python starting…</span>
+  </header>
+
+  <nav class="tabs" role="tablist" aria-label="Sections">
+    <button role="tab" aria-selected="true" data-tab="sim">Simulate</button>
+    <button role="tab" aria-selected="false" data-tab="fc">Forecast (ML)</button>
+    <button role="tab" aria-selected="false" data-tab="plan">Staff planner</button>
+    <button role="tab" aria-selected="false" data-tab="cam">Car counter</button>
+    <button role="tab" aria-selected="false" data-tab="about">How it works</button>
+  </nav>
+
+  <div class="loading" id="loading">
+    <div class="spinner" aria-hidden="true"></div>
+    <div><b id="loadText">Starting Python in your browser…</b>
+      <div class="small">Everything runs on this device. The first visit downloads about 12 MB.</div></div>
+  </div>
+
+  <main class="app" id="app" hidden>
+    <!-- ======================================================== SIMULATE -->
+    <section data-panel="sim">
+      <div class="block">
+        <div class="block-head"><h2>Compare two ways of running the site</h2>
+          <div class="seg" id="siteSeg">
+            <button data-site="drive_through" aria-pressed="true">Drive-through</button>
+            <button data-site="parking_exit" aria-pressed="false">Parking exit</button>
+          </div>
+        </div>
+        <p class="small">Every car is followed from arrival to leaving the property. Both setups get exactly the same customers, and the comparison is repeated with different random customers so you see a range, not one lucky run.</p>
+        <div class="grid3">
+          <label>Demand<select id="demand"></select></label>
+          <label id="flatWrap" hidden>Cars per hour<input id="flatRate" type="number" min="1" max="600" value="80"></label>
+          <label>Cars already in line<input id="initQueue" type="number" min="0" max="60" value="0"></label>
+          <label>Road traffic past the exit (vehicles/hour)<input id="roadFlow" type="number" min="0" max="2500" value="600"></label>
+          <label>Repeat runs<select id="reps"><option>10</option><option selected>30</option><option>60</option></select></label>
+        </div>
+        <p class="small" id="gapNote"></p>
+        <div class="scen">
+          <fieldset><legend>Current</legend><div id="curFields" class="fields"></div></fieldset>
+          <fieldset><legend>Proposed</legend><div id="proFields" class="fields"></div></fieldset>
+        </div>
+        <div class="row">
+          <button class="primary" id="runSim">Run comparison</button>
+          <button id="copyCur">Copy current → proposed</button>
+          <span class="small" id="simStatus"></span>
+        </div>
+      </div>
+      <div class="block" id="simOut" hidden>
+        <h2>Results</h2>
+        <p class="small" id="simSummary"></p>
+        <div class="tablewrap"><table id="simTable"></table></div>
+        <h3>Cars in line over time <span class="small">(line = typical run, shading = 10th to 90th percentile of runs)</span></h3>
+        <div id="simChart" class="chart"></div>
+        <h3>Watch one run</h3>
+        <div class="row wrap">
+          <div class="seg" id="replaySeg">
+            <button data-which="current" aria-pressed="true">Current</button>
+            <button data-which="proposed" aria-pressed="false">Proposed</button>
+          </div>
+          <button id="playBtn">▶ Play</button>
+          <input type="range" id="replayT" min="0" max="180" step="0.25" value="0" aria-label="Time in the run">
+          <span id="replayClock" class="mono"></span>
+        </div>
+        <div id="lane" class="lane"></div>
+        <p class="small" id="laneNote"></p>
+      </div>
+    </section>
+
+    <!-- ======================================================== FORECAST -->
+    <section data-panel="fc" hidden>
+      <div class="block">
+        <h2>How good is the forecast?</h2>
+        <p class="small">Trained on <b>synthetic practice data</b> (a made-up drive-through, 14 weeks). Models were trained on weeks 5 to 10, chosen on weeks 11 and 12, and scored once on weeks 13 and 14, which they never saw. Lower error is better.</p>
+        <div class="seg" id="taskSeg">
+          <button data-task="day_ahead" aria-pressed="true">Tomorrow, every 15 minutes</button>
+          <button data-task="next15" aria-pressed="false">The next 15 minutes</button>
+        </div>
+        <div class="tablewrap"><table id="scoreTable"></table></div>
+        <p class="small" id="scoreNote"></p>
+      </div>
+      <div class="block">
+        <div class="block-head"><h2>Forecast vs what happened</h2>
+          <label class="inline">Test day <select id="testDay"></select></label></div>
+        <div id="fcChart" class="chart"></div>
+        <p class="small" id="fcDayNote"></p>
+      </div>
+      <div class="block">
+        <h2>What drives the forecast</h2>
+        <p class="small">How much worse the model gets on the test weeks when one input is scrambled (permutation importance). Bigger bar = the model leans on it more.</p>
+        <div id="impChart" class="chart"></div>
+        <h3>Where it struggles</h3>
+        <div class="tablewrap"><table id="periodTable"></table></div>
+      </div>
+      <div class="block">
+        <h2>Next 15 minutes: try it</h2>
+        <div class="grid3">
+          <label>Time on the test day<select id="n15Slot"></select></label>
+          <label>Cars in the last 15 minutes<input id="n15Last" type="number" min="0" max="200" placeholder="from the data"></label>
+        </div>
+        <p id="n15Out" class="big"></p>
+      </div>
+      <div class="block">
+        <h2>Plan a new day (with live weather)</h2>
+        <p class="small">Forecast a day just after the practice data ends. Weather can come from <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (free, no key) for tomorrow in any city, applied to the practice site.</p>
+        <div class="grid3">
+          <label>Day of week<select id="fdWeekday"></select></label>
+          <label>Promotion that day<select id="fdPromo"><option value="0">No</option><option value="1">Yes</option></select></label>
+          <label>Public holiday<select id="fdHoliday"><option value="0">No</option><option value="1">Yes</option></select></label>
+          <label>Weather<select id="fdWeather"><option value="typical">Typical for the season, dry</option><option value="rain">Rainy all day (4 mm/h)</option><option value="live">Live forecast for tomorrow</option></select></label>
+          <label id="cityWrap" hidden>City<input id="fdCity" value="Pittsburgh"></label>
+        </div>
+        <div class="row"><button class="primary" id="fdRun">Forecast this day</button><span class="small" id="fdStatus"></span></div>
+        <div id="fdChart" class="chart" hidden></div>
+        <div class="row" id="fdPlanRow" hidden><button id="fdToPlan">Plan staff for this day →</button></div>
+      </div>
+    </section>
+
+    <!-- ======================================================== PLANNER -->
+    <section data-panel="plan" hidden>
+      <div class="block">
+        <h2>Plan staff for a day</h2>
+        <p class="small">For each shift, every allowed mix of order takers and kitchen crew is simulated against the forecast and the cheapest is kept: wages + the cost of customers' waiting time + lost sales from cars that drive away + a penalty for cars queued on the street.</p>
+        <div class="grid3">
+          <label>Day<select id="plDay"></select></label>
+          <label>Most staff at once<input id="plMax" type="number" min="2" max="8" value="7"></label>
+          <label>Wage ($/hour)<input id="plWage" type="number" min="0" step="0.5" value="16"></label>
+          <label>Cost of a minute of waiting ($)<input id="plWait" type="number" min="0" step="0.05" value="0.30"></label>
+          <label>Lost car ($)<input id="plLost" type="number" min="0" step="0.5" value="6"></label>
+          <label>Car on the street ($/minute)<input id="plStreet" type="number" min="0" step="0.1" value="1"></label>
+        </div>
+        <div class="row"><button class="primary" id="plRun">Make the plan</button><span class="small" id="plStatus"></span></div>
+      </div>
+      <div class="block" id="plOut" hidden>
+        <h2>Recommended staffing</h2>
+        <div class="tablewrap"><table id="plTable"></table></div>
+        <div class="tablewrap"><table id="plCheck"></table></div>
+        <p class="small" id="plNote"></p>
+      </div>
+      <div class="block">
+        <h2>Does it work? Held-out test</h2>
+        <p class="small" id="evalNote"></p>
+        <div class="tablewrap"><table id="evalTable"></table></div>
+      </div>
+    </section>
+
+    <!-- ======================================================== CAMERA -->
+    <section data-panel="cam" hidden>
+      <div class="block">
+        <h2>Count cars from a video or photo</h2>
+        <p class="small">A pretrained vehicle detector (NanoDet-Plus, COCO classes car, motorcycle, bus, truck) runs in Python with OpenCV on this device. Videos are stepped through 4 frames per second; each car is tracked and counted once when it crosses the red line. Nothing is uploaded.</p>
+        <div class="row wrap">
+          <button id="camSample">Use the sample clip</button>
+          <label class="filebtn">Choose a video<input type="file" id="camVideo" accept="video/*" hidden></label>
+          <label class="filebtn">Choose a photo<input type="file" id="camPhoto" accept="image/*" hidden></label>
+          <span class="small" id="camStatus"></span>
+        </div>
+        <div class="row wrap">
+          <label class="inline">Line<select id="camDir"><option value="vertical">Vertical (cars move sideways)</option><option value="horizontal">Horizontal (cars move up/down)</option></select></label>
+          <label class="inline">Position <input type="range" id="camLine" min="0.05" max="0.95" step="0.01" value="0.5"></label>
+          <label class="inline">Only count in band <input type="range" id="camZone" min="0" max="0.9" step="0.05" value="0.3"></label>
+        </div>
+        <div class="stage"><canvas id="camCanvas" width="854" height="480"></canvas></div>
+        <video id="camVid" muted playsinline preload="auto" hidden></video>
+        <div class="row wrap">
+          <button class="primary" id="camRun" disabled>Count cars</button>
+          <button id="camStop" disabled>Stop</button>
+        </div>
+        <p id="camOut" class="big"></p>
+        <div class="row wrap" id="camUse" hidden>
+          <button id="useArrivals">Use as drive-through arrivals</button>
+          <button id="useRoad">Use as road traffic past the exit</button>
+          <button id="useLast15">Use as "last 15 minutes" in the forecast</button>
+          <button id="useQueue" hidden>Use as cars already in line</button>
+        </div>
+        <p class="small" id="camCredit">Sample clip: “MD-355 and MD-124 Gaithersburg MD 2022-07-30”, Wikimedia Commons, CC BY 4.0, trimmed to 30 s and resized. The detector was used as is; it was not trained or checked on this footage, so watch the boxes. The sample shows a public road, so “Use as road traffic past the exit” fits it best.</p>
+      </div>
+    </section>
+
+    <!-- ======================================================== ABOUT -->
+    <section data-panel="about" hidden>
+      <div class="block prose" id="aboutText"></div>
+    </section>
+  </main>
+
+  <footer class="foot small">
+    TrafficFlow by Frank Ncube · Python (Pyodide) in your browser · <a href="https://github.com/Knarf24/trafficflow">Source code</a>
+  </footer>
+  <div id="toast" class="toast" hidden></div>
+  <script src="charts.js"></script>
+  <script src="main.js"></script>
+</body>
+</html>
