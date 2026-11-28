@@ -89,6 +89,21 @@ sh build_site.sh && python -m http.server -d _site 8000   # then open http://loc
 
 The app combines ideas from GeeksforGeeks Python projects, rebuilt for the browser: [Vehicle Detection in a Video frame](https://www.geeksforgeeks.org/python/opencv-python-program-vehicle-detection-video-frame/) and [Scraping Weather Data](https://www.geeksforgeeks.org/python/scraping-weather-data-using-python-to-get-umbrella-reminder-on-email/), together with queue simulation and scikit-learn regression. It continues an earlier JavaScript prototype (FlowLab), which estimated average queue size with a fluid model. This version adds per-vehicle simulation, finite waiting spaces and blocking, real waiting times, ML forecasting and staffing search. The tests check that it reproduces FlowLab's simple analytic cases.
 
+## Fast loading
+
+The page shows straight away and Python starts in the background, so nothing waits on a
+"Starting Python" screen. Anything that needs Python simply waits for it if you are quicker.
+
+- **Saved on the device** (`web/sw.js`): after the first visit, Python (Pyodide) and its packages are kept in
+  the browser, so a refresh or a later visit doesn't download them again. Every app on the same site shares
+  that one saved copy. The app's own files are still fetched fresh, so updates show up right away.
+- **Quick restart** (`web/pyfast.js`): the first visit also saves a snapshot of a freshly started Python.
+  Later visits restore it instead of starting Python from scratch (about 1.2 s down to 0.3 s on a laptop).
+  If the snapshot can't be used (for example after a Pyodide upgrade), Python starts normally and a new one
+  is saved.
+- `build_site.sh` writes the Pyodide version into `sw.js`, so upgrading `web/pyodide/` needs no other change.
+
+
 ## Credits and licences
 
 - Code: MIT (see `LICENSE`)

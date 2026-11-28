@@ -1,7 +1,7 @@
 // Runs all the Python (the trafficflow package) in a background thread so the page stays smooth.
 // Messages in:  {id, type: "call", name, args} | {id, type: "vision-init"} | {id, type: "frame"|"photo", ...}
 // Messages out: {id, ok} | {id, error} | {type: "status", text} | {type: "progress", ...}
-importScripts("pyodide/pyodide.js");
+importScripts("pyodide/pyodide.js", "pyfast.js");
 
 const base = new URL("./", self.location.href).href;
 let py = null;
@@ -16,12 +16,15 @@ async function fetchText(path) {
 }
 
 async function init() {
-  self.postMessage({ type: "status", text: "Starting Python…" });
-  py = await loadPyodide({ indexURL: base + "pyodide/" });
+  // The code, practice data and models download while Python starts.
+  const code = Promise.all(PY_FILES.map((f) => fetchText("trafficflow/" + f)));
+  const data = Promise.all([fetchText("data/synthetic_drive_through.csv"), fetchText("data/models.json")]);
+  code.catch(() => {}); data.catch(() => {}); // reported below
+  py = await loadPyodideFast({ indexURL: base + "pyodide/" });
   py.FS.mkdirTree("/home/pyodide/trafficflow");
-  for (const f of PY_FILES) py.FS.writeFile("/home/pyodide/trafficflow/" + f, await fetchText("trafficflow/" + f));
+  (await code).forEach((text, i) => py.FS.writeFile("/home/pyodide/trafficflow/" + PY_FILES[i], text));
   self.postMessage({ type: "status", text: "Loading the practice data and the trained models…" });
-  const [csv, models] = await Promise.all([fetchText("data/synthetic_drive_through.csv"), fetchText("data/models.json")]);
+  const [csv, models] = await data;
   py.runPython("from trafficflow import api");
   api = py.globals.get("api");
   const res = JSON.parse(api.call("load", JSON.stringify({ csv, models })));
