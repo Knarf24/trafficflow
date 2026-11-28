@@ -756,7 +756,8 @@ async function onReady(info) {
     return;
   }
   $("loading").hidden = true;
-  $("app").hidden = false;
+  $("app").inert = false;
+  $("app").classList.remove("warming");
   $("pyStatus").textContent = "Python ready";
   buildFields();
   await updateGap();
@@ -775,4 +776,17 @@ async function onReady(info) {
   try { tab = localStorage.getItem("tf.tab") || "sim"; } catch { /* private mode */ }
   if (location.hash.length > 1) tab = location.hash.slice(1);
   if (document.querySelector(`[data-panel="${tab}"]`)) showTab(tab);
+  document.documentElement.dataset.py = "ready";
+  // Keeps Python saved on this device so the next visit starts without downloading it (see sw.js).
+  if ("serviceWorker" in navigator && isSecureContext) navigator.serviceWorker.register("sw.js").catch(() => {});
+}
+
+// The page shows right away and can be read while Python starts in the background; the controls
+// switch on once it is ready (about half a second on a repeat visit).
+{
+  let tab = "sim";
+  try { tab = localStorage.getItem("tf.tab") || "sim"; } catch { /* private mode */ }
+  if (location.hash.length > 1) tab = location.hash.slice(1);
+  if (document.querySelector(`[data-panel="${tab}"]`)) showTab(tab);
+  document.documentElement.dataset.ui = "ready";
 }

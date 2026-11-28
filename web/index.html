@@ -28,13 +28,13 @@
     <button role="tab" aria-selected="false" data-tab="about">How it works</button>
   </nav>
 
-  <div class="loading" id="loading">
+  <div class="loading slim" id="loading" role="status">
     <div class="spinner" aria-hidden="true"></div>
-    <div><b id="loadText">Starting Python in your browser…</b>
-      <div class="small">Everything runs on this device. The first visit downloads about 12 MB.</div></div>
+    <div><b id="loadText">Starting Python in the background…</b>
+      <div class="small">Everything runs on this device. The first visit downloads Python once (about 12 MB); after that it is saved on this device.</div></div>
   </div>
 
-  <main class="app" id="app" hidden>
+  <main class="app warming" id="app" inert>
     <!-- ======================================================== SIMULATE -->
     <section data-panel="sim">
       <div class="block">
